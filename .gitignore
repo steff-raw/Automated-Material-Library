@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+.pio/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.Python
+
+# Environment / secrets
+.env
+.env.local
+frontend/.env
+bridge/.env
+
+# Build / IDE
+dist/
+build/
+.DS_Store
+*.log
+.vscode/
+.idea/
+*.egg-info/
