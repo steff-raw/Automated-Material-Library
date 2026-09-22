@@ -20,13 +20,9 @@ function LoadingState({ label }: { label: string }) {
 }
 
 function useDemoMode(): boolean {
-  const hasEnv = Boolean(
-    import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY,
-  )
-  const params = new URLSearchParams(window.location.search)
-  if (params.get('demo') === '1') return true
-  if (params.get('demo') === '0') return false
-  return !hasEnv
+  // Force mockup in View Material Assets for now (tap samples to place on table).
+  // Re-enable env / ?demo= detection when wiring live RFID again.
+  return true
 }
 
 export default function App() {
