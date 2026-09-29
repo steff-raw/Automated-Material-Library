@@ -42,6 +42,26 @@ Use the PN532 module in **SPI mode** (typically SEL0/SEL1 jumpers or switches �
 
 ---
 
+## Cloud setup (no local server)
+
+- **Bridge** → Supabase Edge Function [`supabase/functions/bridge`](supabase/functions/bridge/index.ts), same routes as `bridge/main.py`
+  - URL: `https://<project-ref>.supabase.co/functions/v1/bridge/scan`
+  - Deploy with JWT verification **off**; it checks its own auth:
+    - ESP32 → `x-device-token` header, matched against `public.bridge_devices` (Table Editor → `bridge_devices` → `token`)
+    - Web app → public anon key (Add Material)
+  - Service role key stays inside Supabase
+- **Frontend** → Vercel, root directory `frontend`, env vars:
+  - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+  - `VITE_BRIDGE_URL=https://<project-ref>.supabase.co/functions/v1/bridge`
+- **ESP32** → setup portal fields:
+  - Bridge endpoint URL: the Edge Function `/scan` URL (the firmware default)
+  - Device token: from `bridge_devices`
+  - Reopen the portal any time: tap **RST**, then hold **BOOT** within 2 s
+
+The local FastAPI bridge below still works for LAN-only setups (leave the device token empty).
+
+---
+
 ## 1. Supabase setup
 
 1. Create a project at [supabase.com](https://supabase.com)

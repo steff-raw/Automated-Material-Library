@@ -57,6 +57,21 @@ create policy "Anon can read active_scans"
 -- Writes go through the bridge with the service role key (bypasses RLS).
 
 -- ---------------------------------------------------------------------------
+-- bridge_devices — device tokens for the cloud bridge (Edge Function).
+-- RLS on with no policies: only the service role can read it.
+-- ---------------------------------------------------------------------------
+create table if not exists public.bridge_devices (
+  token text primary key,
+  name text not null,
+  created_at timestamptz not null default now()
+);
+alter table public.bridge_devices enable row level security;
+
+insert into public.bridge_devices (token, name)
+values (encode(extensions.gen_random_bytes(16), 'hex'), 'reader-1')
+on conflict do nothing;
+
+-- ---------------------------------------------------------------------------
 -- Seed materials (replace rfid_id values with your physical tag UIDs)
 -- ---------------------------------------------------------------------------
 insert into public.materials (
