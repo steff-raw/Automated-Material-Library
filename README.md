@@ -27,25 +27,16 @@ Supabase credentials stay on the bridge and frontend only — never on the ESP32
 
 ## PN532 ↔ ESP32 wiring (SPI)
 
-| PN532 pin | ESP32 WROOM-32 |
-|-----------|----------------|
-| SCK       | GPIO 18        |
-| MISO      | GPIO 19        |
-| MOSI      | GPIO 23        |
-| SS (CS)   | GPIO 5         |
-| VCC       | **3.3V**       |
-| GND       | GND            |
+| PN532 pin | ESP32-S3 DevKitC-1 (default) | ESP32 WROOM-32 (`-e esp32dev`) |
+|-----------|-----------------------------|--------------------------------|
+| SCK       | GPIO 12                     | GPIO 18                        |
+| MISO      | GPIO 13                     | GPIO 19                        |
+| MOSI      | GPIO 11                     | GPIO 23                        |
+| SS (CS)   | GPIO 10                     | GPIO 5                         |
+| VCC       | **3V3**                     | **3.3V**                       |
+| GND       | GND                         | GND                            |
 
-```
-PN532                ESP32 WROOM-32
------                --------------
-SCK   -------------> GPIO 18
-MISO  <------------- GPIO 19
-MOSI  -------------> GPIO 23
-SS    -------------> GPIO 5
-VCC   -------------> 3.3V
-GND   -------------> GND
-```
+On the ESP32-S3, GPIO 19/20 are the native USB pins — do not use them. Pins are set per board in `firmware/src/config.h`.
 
 Use the PN532 module in **SPI mode** (typically SEL0/SEL1 jumpers or switches — check your board’s silkscreen). Do not power the module from 5V if it is a 3.3V-only breakout.
 
@@ -108,7 +99,7 @@ Without Supabase credentials the UI opens in **demo mode**: tap samples in the b
 
 ## 4. ESP32 firmware (PlatformIO)
 
-**Requirements:** [PlatformIO](https://platformio.org/) (VS Code extension or CLI), ESP32 WROOM-32 board, PN532 wired as above.
+**Requirements:** [PlatformIO](https://platformio.org/) (VS Code extension or CLI), ESP32-S3 DevKitC-1 (default) or ESP32 WROOM-32 (`pio run -e esp32dev -t upload`), PN532 wired as above. On the dual USB-C S3 board, plug into the **COM** port (not **USB**) for upload and Serial Monitor.
 
 ```bash
 cd firmware

@@ -1,10 +1,19 @@
 #pragma once
 
-// PN532 SPI ↔ ESP32 WROOM-32 pin mapping
+// PN532 SPI pin mapping
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+// ESP32-S3 DevKitC-1 (GPIO 19/20 are USB, so use the FSPI pins)
+#define PN532_SCK   12
+#define PN532_MISO  13
+#define PN532_MOSI  11
+#define PN532_SS    10
+#else
+// ESP32 WROOM-32
 #define PN532_SCK   18
 #define PN532_MISO  19
 #define PN532_MOSI  23
 #define PN532_SS    5
+#endif
 
 // WiFiManager custom parameter for the bridge POST URL
 #define WM_PARAM_ENDPOINT_ID   "endpoint_url"
