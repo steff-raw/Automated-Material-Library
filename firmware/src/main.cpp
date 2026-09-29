@@ -12,6 +12,7 @@ static Preferences prefs;
 
 static String lastUid;
 static unsigned long lastScanMs = 0;
+static bool writeNextTag = false;
 
 static String loadSavedEndpoint() {
   prefs.begin("aml", true);
@@ -79,6 +80,7 @@ void setup() {
   if (!reader.begin()) {
     Serial.println(F("[RFID] Init failed — will keep retrying in loop"));
   }
+  Serial.println(F("[RFID] Send W over Serial Monitor to write AML-<UID> to a blank NDEF tag"));
 }
 
 void loop() {
@@ -87,6 +89,15 @@ void loop() {
   if (!reader.isReady() && (millis() - lastRfidRetryMs) > 3000) {
     lastRfidRetryMs = millis();
     reader.begin();
+  }
+
+  if (Serial.available() > 0) {
+    char command = Serial.read();
+    if (command == 'w' || command == 'W') {
+      writeNextTag = true;
+      lastUid = "";
+      Serial.println(F("[RFID] Write armed. Present one blank NDEF tag."));
+    }
   }
 
   if (WiFi.status() != WL_CONNECTED) {
@@ -114,6 +125,11 @@ void loop() {
 
   Serial.print(F("[RFID] Tag detected: "));
   Serial.println(uid);
+
+  if (writeNextTag) {
+    writeNextTag = false;
+    reader.writeElementIdForCurrentTag(uid);
+  }
 
   publisher.publish(uid);
   delay(100);

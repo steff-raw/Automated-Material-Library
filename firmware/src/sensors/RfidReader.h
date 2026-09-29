@@ -15,6 +15,7 @@ class RfidReader {
    * outUidHex is uppercase hex without separators (e.g. "04A1B2C3").
    */
   bool readUidHex(String& outUidHex);
+  bool writeElementIdForCurrentTag(const String& uidHex);
 
  private:
   bool ready_ = false;
