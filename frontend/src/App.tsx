@@ -3,11 +3,13 @@ import { AddMaterialPage } from './components/AddMaterialPage'
 import { DemoBrowser } from './components/DemoBrowser'
 import { HomeScreen } from './components/HomeScreen'
 import { IdleScreen } from './components/IdleScreen'
+import { LinkMaterialsPage } from './components/LinkMaterialsPage'
 import { MaterialWall } from './components/MaterialWall'
 import { useActiveScans } from './hooks/useActiveScans'
 import { useMaterialsByRfids } from './hooks/useMaterialsByRfids'
+import { hasSupabaseConfig } from './lib/supabase'
 
-type AppPage = 'home' | 'add' | 'view'
+type AppPage = 'home' | 'add' | 'view' | 'link'
 
 function LoadingState({ label }: { label: string }) {
   return (
@@ -20,9 +22,8 @@ function LoadingState({ label }: { label: string }) {
 }
 
 function useDemoMode(): boolean {
-  // Force mockup in View Material Assets for now (tap samples to place on table).
-  // Re-enable env / ?demo= detection when wiring live RFID again.
-  return true
+  // Live RFID table when Supabase is configured; ?demo forces the tap-to-place mockup.
+  return !hasSupabaseConfig || new URLSearchParams(window.location.search).has('demo')
 }
 
 export default function App() {
@@ -35,8 +36,13 @@ export default function App() {
       <HomeScreen
         onAdd={() => setPage('add')}
         onView={() => setPage('view')}
+        onLink={() => setPage('link')}
       />
     )
+  }
+
+  if (page === 'link') {
+    return <LinkMaterialsPage onBack={() => setPage('home')} />
   }
 
   if (page === 'add') {

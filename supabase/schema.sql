@@ -6,7 +6,7 @@
 -- ---------------------------------------------------------------------------
 create table if not exists public.materials (
   id uuid primary key default gen_random_uuid(),
-  rfid_id text not null unique,
+  rfid_id text unique,  -- null until a tag is linked (Link Materials)
   name text not null,
   supplier text,
   cost_per_unit text,
