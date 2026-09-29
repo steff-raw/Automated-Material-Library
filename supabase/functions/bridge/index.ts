@@ -4,6 +4,7 @@
 //   DELETE /bridge/scan/:rfid_id                        device token
 //   DELETE /bridge/scans                                device token
 //   POST   /bridge/materials       MaterialPayload      public anon key
+//   POST   /bridge/link            {rfid_id, material_id} public anon key
 //
 // Deployed with verify_jwt = false: the ESP32 authenticates with the
 // x-device-token header (checked against public.bridge_devices), the web app
@@ -123,6 +124,38 @@ Deno.serve(async (req) => {
       .select()
       .single()
     if (error) return json({ detail: 'Failed to save material' }, 502)
+    return json({ ok: true, material: data })
+  }
+
+  if (req.method === 'POST' && path === '/link') {
+    if (!isWebApp(req) && !(await isDevice(req))) return json({ detail: 'Unauthorized' }, 401)
+    const body = await req.json().catch(() => ({}))
+    const rfid_id = cleanRfid(body.rfid_id)
+    const material_id = typeof body.material_id === 'string' ? body.material_id : null
+    if (!rfid_id || !material_id) {
+      return json({ detail: 'rfid_id (hex) and material_id are required' }, 400)
+    }
+
+    // One tag ↔ one material: release the tag from any other material first
+    const { error: releaseError } = await supabase
+      .from('materials')
+      .update({ rfid_id: null })
+      .eq('rfid_id', rfid_id)
+      .neq('id', material_id)
+    if (releaseError) return json({ detail: 'Failed to release tag' }, 502)
+
+    const { data, error } = await supabase
+      .from('materials')
+      .update({ rfid_id })
+      .eq('id', material_id)
+      .select()
+      .maybeSingle()
+    if (error) return json({ detail: 'Failed to link tag' }, 502)
+    if (!data) return json({ detail: 'Material not found' }, 404)
+
+    // The linking scan should not stay on the presentation table
+    await supabase.from('active_scans').delete().eq('rfid_id', rfid_id)
+    console.log(`link ${rfid_id} -> ${material_id}`)
     return json({ ok: true, material: data })
   }
 

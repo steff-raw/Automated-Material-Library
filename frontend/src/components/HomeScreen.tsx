@@ -1,9 +1,10 @@
 type HomeScreenProps = {
   onAdd: () => void
   onView: () => void
+  onLink: () => void
 }
 
-export function HomeScreen({ onAdd, onView }: HomeScreenProps) {
+export function HomeScreen({ onAdd, onView, onLink }: HomeScreenProps) {
   return (
     <div className="relative flex min-h-full flex-col overflow-hidden">
       <div
@@ -76,6 +77,27 @@ export function HomeScreen({ onAdd, onView }: HomeScreenProps) {
             </span>
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={onLink}
+          className="animate-fade-up-delay mt-4 flex max-w-3xl items-center justify-between border border-dashed border-ink/25 bg-paper/50 px-6 py-4 text-left transition-colors hover:border-ink/50"
+        >
+          <span>
+            <span className="text-[0.65rem] font-medium tracking-[0.25em] text-mist uppercase">
+              Test
+            </span>
+            <span className="mt-1 block font-display text-xl font-medium text-ink">
+              Link Materials
+            </span>
+            <span className="mt-1 block text-sm text-stone">
+              Scan an NFC tag and assign it to a material in the library.
+            </span>
+          </span>
+          <span aria-hidden="true" className="text-accent">
+            →
+          </span>
+        </button>
       </div>
     </div>
   )

@@ -58,6 +58,9 @@ Use the PN532 module in **SPI mode** (typically SEL0/SEL1 jumpers or switches �
   - Device token: from `bridge_devices`
   - Reopen the portal any time: tap **RST**, then hold **BOOT** within 2 s
 
+- **Link Materials** (home screen, test tool) → place a tag, pick a material, **Link** → `POST /bridge/link` sets `materials.rfid_id` (a tag moves off any material it was on)
+- **View Material Assets** reads live from Supabase; append `?demo` to the URL for the offline mockup
+
 The local FastAPI bridge below still works for LAN-only setups (leave the device token empty).
 
 ---

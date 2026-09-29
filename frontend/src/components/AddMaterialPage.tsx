@@ -1,18 +1,7 @@
 import { useState, type FormEvent } from 'react'
+import { bridgeHeaders, bridgeUrl } from '../lib/bridge'
 import { saveCustomMaterial } from '../lib/localMaterials'
 import type { Material } from '../types'
-
-/** The cloud bridge (Supabase Edge Function) accepts the public anon key. */
-function bridgeHeaders(): Record<string, string> {
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
-  return anonKey
-    ? {
-        'Content-Type': 'application/json',
-        apikey: anonKey,
-        Authorization: `Bearer ${anonKey}`,
-      }
-    : { 'Content-Type': 'application/json' }
-}
 
 type AddMaterialPageProps = {
   onBack: () => void
@@ -113,11 +102,9 @@ export function AddMaterialPage({ onBack, onSaved }: AddMaterialPageProps) {
       datasheet_url: form.datasheet_url.trim() || null,
     }
 
-    const bridgeUrl = import.meta.env.VITE_BRIDGE_URL as string | undefined
-
     try {
       if (bridgeUrl) {
-        const res = await fetch(`${bridgeUrl.replace(/\/$/, '')}/materials`, {
+        const res = await fetch(`${bridgeUrl}/materials`, {
           method: 'POST',
           headers: bridgeHeaders(),
           body: JSON.stringify(payload),
@@ -176,7 +163,7 @@ export function AddMaterialPage({ onBack, onSaved }: AddMaterialPageProps) {
         </h1>
         <p className="mt-2 max-w-xl text-sm text-stone sm:text-base">
           Register a sample with its RFID tag ID and specification data.
-          {!import.meta.env.VITE_BRIDGE_URL && (
+          {!bridgeUrl && (
             <span className="block mt-1 text-mist">
               Demo mode: saved locally in this browser.
             </span>
