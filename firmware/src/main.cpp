@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include <WiFiManager.h>
+#include <time.h>
 
 #include "config.h"
 #include "sensors/RfidReader.h"
@@ -28,8 +29,22 @@ static void saveEndpoint(const char* url) {
   Serial.println(url);
 }
 
+static String loadSavedToken() {
+  prefs.begin("aml", true);
+  String token = prefs.getString("token", "");
+  prefs.end();
+  return token;
+}
+
+static void saveToken(const char* token) {
+  prefs.begin("aml", false);
+  prefs.putString("token", token);
+  prefs.end();
+}
+
 static void setupWiFiAndEndpoint() {
   String savedEndpoint = loadSavedEndpoint();
+  String savedToken = loadSavedToken();
 
   WiFiManager wm;
   wm.setConfigPortalTimeout(180);
@@ -41,13 +56,39 @@ static void setupWiFiAndEndpoint() {
       savedEndpoint.c_str(),
       WM_PARAM_ENDPOINT_LEN);
 
+  auto* tokenParam = new WiFiManagerParameter(
+      WM_PARAM_TOKEN_ID,
+      WM_PARAM_TOKEN_LABEL,
+      savedToken.c_str(),
+      WM_PARAM_TOKEN_LEN);
+
   wm.addParameter(endpointParam);
-  wm.setSaveParamsCallback([endpointParam]() {
+  wm.addParameter(tokenParam);
+  wm.setSaveParamsCallback([endpointParam, tokenParam]() {
     saveEndpoint(endpointParam->getValue());
+    saveToken(tokenParam->getValue());
   });
 
-  Serial.println(F("[WIFI] Starting WiFiManager (portal SSID: MaterialLibrary-Setup)"));
-  bool connected = wm.autoConnect("MaterialLibrary-Setup");
+  // BOOT low at reset enters the bootloader, so watch for it just after boot
+  pinMode(CONFIG_BUTTON_PIN, INPUT_PULLUP);
+  Serial.println(F("[WIFI] Hold BOOT now to open the setup portal..."));
+  bool forcePortal = false;
+  for (unsigned long start = millis(); millis() - start < 2000;) {
+    if (digitalRead(CONFIG_BUTTON_PIN) == LOW) {
+      forcePortal = true;
+      break;
+    }
+    delay(20);
+  }
+
+  bool connected;
+  if (forcePortal) {
+    Serial.println(F("[WIFI] BOOT held — opening portal (SSID: MaterialLibrary-Setup)"));
+    connected = wm.startConfigPortal("MaterialLibrary-Setup");
+  } else {
+    Serial.println(F("[WIFI] Starting WiFiManager (portal SSID: MaterialLibrary-Setup)"));
+    connected = wm.autoConnect("MaterialLibrary-Setup");
+  }
 
   if (!connected) {
     Serial.println(F("[WIFI] Failed to connect or portal timed out — restarting"));
@@ -58,6 +99,15 @@ static void setupWiFiAndEndpoint() {
   Serial.print(F("[WIFI] Connected. IP="));
   Serial.println(WiFi.localIP());
 
+  // Certificate validity checks need the real time
+  configTime(0, 0, "pool.ntp.org", "time.google.com");
+  Serial.print(F("[TIME] Syncing"));
+  for (int i = 0; i < 40 && time(nullptr) < 1700000000; i++) {
+    Serial.print('.');
+    delay(250);
+  }
+  Serial.println(time(nullptr) >= 1700000000 ? F(" ok") : F(" failed (HTTPS may fail)"));
+
   // Persist whatever is in the field (portal save or prior NVS value)
   const char* endpoint = endpointParam->getValue();
   if (endpoint && strlen(endpoint) > 0) {
@@ -66,6 +116,10 @@ static void setupWiFiAndEndpoint() {
   } else {
     publisher.setEndpoint(savedEndpoint);
   }
+
+  const char* token = tokenParam->getValue();
+  saveToken(token);
+  publisher.setDeviceToken(token);
 }
 
 void setup() {

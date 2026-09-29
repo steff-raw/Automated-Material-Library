@@ -19,9 +19,18 @@
 #define WM_PARAM_ENDPOINT_ID   "endpoint_url"
 #define WM_PARAM_ENDPOINT_LABEL "Bridge endpoint URL"
 #define WM_PARAM_ENDPOINT_LEN  128
-#define WM_PARAM_ENDPOINT_DEFAULT "http://192.168.1.100:8000/scan"
+#define WM_PARAM_ENDPOINT_DEFAULT "https://tpvrivhjsstbmwzvcvmj.supabase.co/functions/v1/bridge/scan"
+
+// WiFiManager custom parameter for the cloud bridge device token
+// (row in public.bridge_devices; leave empty for the local LAN bridge)
+#define WM_PARAM_TOKEN_ID     "device_token"
+#define WM_PARAM_TOKEN_LABEL  "Device token"
+#define WM_PARAM_TOKEN_LEN    65
 
 // Debounce: ignore the same UID within this window (ms)
 #define RFID_DEBOUNCE_MS 2000
 
 #define SERIAL_BAUD 115200
+
+// Tap RST, then hold BOOT (GPIO 0) within 2 s to reopen the WiFi/endpoint portal
+#define CONFIG_BUTTON_PIN 0

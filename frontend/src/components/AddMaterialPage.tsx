@@ -2,6 +2,18 @@ import { useState, type FormEvent } from 'react'
 import { saveCustomMaterial } from '../lib/localMaterials'
 import type { Material } from '../types'
 
+/** The cloud bridge (Supabase Edge Function) accepts the public anon key. */
+function bridgeHeaders(): Record<string, string> {
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+  return anonKey
+    ? {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+      }
+    : { 'Content-Type': 'application/json' }
+}
+
 type AddMaterialPageProps = {
   onBack: () => void
   onSaved: () => void
@@ -107,7 +119,7 @@ export function AddMaterialPage({ onBack, onSaved }: AddMaterialPageProps) {
       if (bridgeUrl) {
         const res = await fetch(`${bridgeUrl.replace(/\/$/, '')}/materials`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: bridgeHeaders(),
           body: JSON.stringify(payload),
         })
         if (!res.ok) {
