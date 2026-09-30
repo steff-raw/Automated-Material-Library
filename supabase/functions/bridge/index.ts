@@ -133,6 +133,8 @@ Deno.serve(async (req) => {
       .select()
       .single()
     if (error) return json({ detail: 'Failed to save material' }, 502)
+    // The registering scan should not stay on the presentation table
+    await supabase.from('active_scans').delete().eq('rfid_id', rfid_id)
     return json({ ok: true, material: data })
   }
 

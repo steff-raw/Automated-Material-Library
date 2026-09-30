@@ -5,8 +5,11 @@ import { HomeScreen } from './components/HomeScreen'
 import { IdleScreen } from './components/IdleScreen'
 import { LinkMaterialsPage } from './components/LinkMaterialsPage'
 import { MaterialWall } from './components/MaterialWall'
+import { fillSlots } from './lib/slots'
+import { SlotControls } from './components/SlotControls'
 import { useActiveScans } from './hooks/useActiveScans'
 import { useMaterialsByRfids } from './hooks/useMaterialsByRfids'
+import { useSlotCount } from './hooks/useSlotCount'
 import { hasSupabaseConfig } from './lib/supabase'
 
 type AppPage = 'home' | 'add' | 'view' | 'link'
@@ -68,7 +71,9 @@ export default function App() {
 }
 
 function LiveApp({ onHome }: { onHome: () => void }) {
-  const { rfidIds, isIdle, ready } = useActiveScans()
+  const { scans, ready } = useActiveScans()
+  const slotCount = useSlotCount()
+  const rfidIds = scans.slice(-slotCount.count).map((s) => s.rfid_id)
   const { materials, loading, error } = useMaterialsByRfids(rfidIds)
 
   if (!ready) {
@@ -88,7 +93,7 @@ function LiveApp({ onHome }: { onHome: () => void }) {
       </div>
 
       <div className="min-h-0 flex-1">
-        {isIdle || rfidIds.length === 0 ? (
+        {rfidIds.length === 0 ? (
           <IdleScreen />
         ) : loading && materials.length === 0 ? (
           <LoadingState label="Loading materials" />
@@ -99,13 +104,24 @@ function LiveApp({ onHome }: { onHome: () => void }) {
           </div>
         ) : (
           <MaterialWall
-            slots={rfidIds.map((rfidId) => {
-              const material = materials.find((m) => m.rfid_id === rfidId)
-              if (material) return { kind: 'material' as const, material }
-              return { kind: 'unknown' as const, rfidId }
-            })}
+            slots={fillSlots(
+              rfidIds.map((rfidId) => {
+                const material = materials.find((m) => m.rfid_id === rfidId)
+                if (material) return { kind: 'material' as const, material }
+                return { kind: 'unknown' as const, rfidId }
+              }),
+              slotCount.count,
+            )}
           />
         )}
+      </div>
+
+      <div className="z-50 flex shrink-0 justify-center border-t border-ash/40 bg-ink/90 px-3 py-3 text-paper backdrop-blur-sm">
+        <SlotControls
+          count={slotCount.count}
+          onIncrement={slotCount.increment}
+          onDecrement={slotCount.decrement}
+        />
       </div>
     </div>
   )

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { bridgeHeaders, bridgeUrl } from '../lib/bridge'
+import { useTagScan } from '../hooks/useTagScan'
 import { supabase } from '../lib/supabase'
 
 type LinkMaterialsPageProps = {
@@ -14,8 +15,6 @@ type CatalogItem = {
   image_url: string | null
 }
 
-type ScanRow = { rfid_id: string; scanned_at: string }
-
 /**
  * Test tool: place a tag on the reader, the ESP32 posts the UID to the bridge,
  * this page picks it up from active_scans (Realtime) and links it to a material.
@@ -23,7 +22,7 @@ type ScanRow = { rfid_id: string; scanned_at: string }
 export function LinkMaterialsPage({ onBack }: LinkMaterialsPageProps) {
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [catalogError, setCatalogError] = useState<string | null>(null)
-  const [uid, setUid] = useState<string | null>(null)
+  const { uid, reset: resetScan } = useTagScan()
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -45,30 +44,6 @@ export function LinkMaterialsPage({ onBack }: LinkMaterialsPageProps) {
 
   useEffect(() => {
     void loadCatalog()
-  }, [])
-
-  // Only scans that arrive while this page is open count
-  useEffect(() => {
-    if (!supabase) return
-    const openedAt = Date.now()
-    const channel = supabase
-      .channel('link_materials_scans')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'active_scans' },
-        (payload) => {
-          const row = payload.new as Partial<ScanRow>
-          if (!row?.rfid_id || !row.scanned_at) return
-          if (new Date(row.scanned_at).getTime() < openedAt) return
-          setUid(row.rfid_id)
-          setLinked(null)
-          setError(null)
-        },
-      )
-      .subscribe()
-    return () => {
-      void supabase!.removeChannel(channel)
-    }
   }, [])
 
   const currentMaterial = uid ? catalog.find((m) => m.rfid_id === uid) : undefined
@@ -96,7 +71,7 @@ export function LinkMaterialsPage({ onBack }: LinkMaterialsPageProps) {
       if (!res.ok) throw new Error(body.detail ?? `Link failed (${res.status})`)
       const name = catalog.find((m) => m.id === selectedId)?.name ?? 'material'
       setLinked(`${uid} → ${name}`)
-      setUid(null)
+      resetScan()
       setSelectedId(null)
       setQuery('')
       await loadCatalog()
