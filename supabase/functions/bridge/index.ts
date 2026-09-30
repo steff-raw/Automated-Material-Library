@@ -12,10 +12,8 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-)
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+const supabase = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
 
 const CORS = {
@@ -43,10 +41,21 @@ async function isDevice(req: Request): Promise<boolean> {
   return !error && data !== null
 }
 
-function isWebApp(req: Request): boolean {
-  if (!ANON_KEY) return false
+const verifiedKeys = new Set<string>()
+
+// The runtime's SUPABASE_ANON_KEY may be a different key format than the one
+// the web app ships, so fall back to asking PostgREST whether the key is valid.
+async function isWebApp(req: Request): Promise<boolean> {
   const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
-  return req.headers.get('apikey') === ANON_KEY || bearer === ANON_KEY
+  const key = req.headers.get('apikey') ?? bearer
+  if (!key) return false
+  if (key === ANON_KEY || verifiedKeys.has(key)) return true
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/materials?select=id&limit=1`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+  })
+  await res.body?.cancel()
+  if (res.ok) verifiedKeys.add(key)
+  return res.ok
 }
 
 function cleanRfid(value: unknown): string | null {
@@ -98,7 +107,7 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === 'POST' && path === '/materials') {
-    if (!isWebApp(req) && !(await isDevice(req))) return json({ detail: 'Unauthorized' }, 401)
+    if (!(await isWebApp(req)) && !(await isDevice(req))) return json({ detail: 'Unauthorized' }, 401)
     const body = await req.json().catch(() => ({}))
     const rfid_id = cleanRfid(body.rfid_id)
     const name = optionalText(body.name)
@@ -128,7 +137,7 @@ Deno.serve(async (req) => {
   }
 
   if (req.method === 'POST' && path === '/link') {
-    if (!isWebApp(req) && !(await isDevice(req))) return json({ detail: 'Unauthorized' }, 401)
+    if (!(await isWebApp(req)) && !(await isDevice(req))) return json({ detail: 'Unauthorized' }, 401)
     const body = await req.json().catch(() => ({}))
     const rfid_id = cleanRfid(body.rfid_id)
     const material_id = typeof body.material_id === 'string' ? body.material_id : null
