@@ -3,12 +3,12 @@ import { downloadTexturePack } from '../lib/downloadTextures'
 import type { Material } from '../types'
 import { DetailsTable } from './DetailsTable'
 import { MaterialCard } from './MaterialCard'
-import { slotRfid, type Slot } from '../lib/slots'
+import { slotKey, type Slot } from '../lib/slots'
 
 type MaterialWallProps = {
   slots: Slot[]
-  /** Shows a hover × on each tile that removes it from the wall */
-  onRemove?: (rfidId: string) => void
+  /** Shows a hover × on each tile that removes it from the wall (receives slotKey) */
+  onRemove?: (key: string) => void
 }
 
 function galleryGridClass(count: number): string {
@@ -126,7 +126,7 @@ export function MaterialWall({ slots, onRemove }: MaterialWallProps) {
           >
             {slots.map((slot, index) => (
               <div
-                key={slotRfid(slot)}
+                key={slotKey(slot)}
                 className={`group/tile relative min-h-0 overflow-hidden bg-paper transition-all duration-500 ease-out ${
                   showDetails ? '' : galleryCellClass(count, index)
                 }`}
@@ -144,7 +144,7 @@ export function MaterialWall({ slots, onRemove }: MaterialWallProps) {
                 {onRemove && (
                   <button
                     type="button"
-                    onClick={() => onRemove(slotRfid(slot))}
+                    onClick={() => onRemove(slotKey(slot))}
                     aria-label="Remove from wall"
                     title="Remove from wall"
                     className="absolute top-2 right-2 z-30 flex h-7 w-7 items-center justify-center rounded-full bg-ink/70 text-sm leading-none text-paper opacity-0 shadow-sm transition-opacity duration-200 group-hover/tile:opacity-100 hover:bg-ink focus-visible:opacity-100"

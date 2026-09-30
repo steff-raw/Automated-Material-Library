@@ -59,7 +59,7 @@ export function DetailsTable({ materials }: DetailsTableProps) {
             <tbody>
               {materials.map((material, rowIndex) => (
                 <tr
-                  key={material.rfid_id}
+                  key={material.id}
                   className="group/row border-b border-ash/25 transition-colors hover:bg-[#ebe6dc]/60"
                   style={{
                     animation: 'fade-up 0.45s ease-out both',

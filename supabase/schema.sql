@@ -72,6 +72,42 @@ values (encode(extensions.gen_random_bytes(16), 'hex'), 'reader-1')
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------
+-- projects → rooms → room_materials (saved room palettes)
+-- Public read; writes go through the bridge (service role).
+-- ---------------------------------------------------------------------------
+create table if not exists public.projects (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists projects_name_key on public.projects (lower(name));
+
+create table if not exists public.rooms (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  name text not null,
+  position int not null default 0,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists rooms_project_name_key on public.rooms (project_id, lower(name));
+
+create table if not exists public.room_materials (
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  material_id uuid not null references public.materials(id) on delete cascade,
+  position int not null default 0,
+  primary key (room_id, material_id)
+);
+create index if not exists room_materials_material_idx on public.room_materials (material_id);
+
+alter table public.projects enable row level security;
+alter table public.rooms enable row level security;
+alter table public.room_materials enable row level security;
+
+create policy "Anon can read projects" on public.projects for select to anon, authenticated using (true);
+create policy "Anon can read rooms" on public.rooms for select to anon, authenticated using (true);
+create policy "Anon can read room_materials" on public.room_materials for select to anon, authenticated using (true);
+
+-- ---------------------------------------------------------------------------
 -- Seed materials (replace rfid_id values with your physical tag UIDs)
 -- ---------------------------------------------------------------------------
 insert into public.materials (

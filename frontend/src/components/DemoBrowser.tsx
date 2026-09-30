@@ -3,8 +3,14 @@ import { getAllLocalMaterials } from '../lib/localMaterials'
 import type { Material } from '../types'
 import { IdleScreen } from './IdleScreen'
 import { MaterialWall } from './MaterialWall'
+import { slotKey } from '../lib/slots'
 
 const MAX_ON_TABLE = 12
+
+/** Demo catalog entries always carry a tag; fall back to the id just in case. */
+function demoTag(material: Material): string {
+  return material.rfid_id ?? material.id
+}
 
 type DemoBrowserProps = {
   onHome: () => void
@@ -17,19 +23,20 @@ export function DemoBrowser({ onHome, catalogVersion }: DemoBrowserProps) {
 
   const slots = useMemo(() => {
     return onTable.map((rfidId) => {
-      const material = catalog.find((m) => m.rfid_id === rfidId)
+      const material = catalog.find((m) => demoTag(m) === rfidId)
       if (material) return { kind: 'material' as const, material }
       return { kind: 'unknown' as const, rfidId }
     })
   }, [onTable, catalog])
 
   function place(material: Material) {
+    const tag = demoTag(material)
     setOnTable((prev) => {
-      if (prev.includes(material.rfid_id)) {
-        return prev.filter((id) => id !== material.rfid_id)
+      if (prev.includes(tag)) {
+        return prev.filter((id) => id !== tag)
       }
       if (prev.length >= MAX_ON_TABLE) return prev
-      return [...prev, material.rfid_id]
+      return [...prev, tag]
     })
   }
 
@@ -45,7 +52,10 @@ export function DemoBrowser({ onHome, catalogVersion }: DemoBrowserProps) {
         ) : (
           <MaterialWall
             slots={slots}
-            onRemove={(rfidId) => setOnTable((prev) => prev.filter((id) => id !== rfidId))}
+            onRemove={(key) => {
+              const index = slots.findIndex((slot) => slotKey(slot) === key)
+              setOnTable((prev) => prev.filter((_, i) => i !== index))
+            }}
           />
         )}
       </div>
@@ -75,11 +85,11 @@ export function DemoBrowser({ onHome, catalogVersion }: DemoBrowserProps) {
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {catalog.map((material) => {
-            const active = onTable.includes(material.rfid_id)
+            const active = onTable.includes(demoTag(material))
             const full = !active && onTable.length >= MAX_ON_TABLE
             return (
               <button
-                key={material.rfid_id}
+                key={material.id}
                 type="button"
                 disabled={full}
                 onClick={() => place(material)}

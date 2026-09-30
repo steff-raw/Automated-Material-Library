@@ -59,7 +59,12 @@ Use the PN532 module in **SPI mode** (typically SEL0/SEL1 jumpers or switches �
   - Reopen the portal any time: tap **RST**, then hold **BOOT** within 2 s
 
 - **Link Materials** (home screen, test tool) → place a tag, pick a material, **Link** → `POST /bridge/link` sets `materials.rfid_id` (a tag moves off any material it was on)
-- **View Material Assets** reads live from Supabase; append `?demo` to the URL for the offline mockup
+- **View Material Assets** → asks for project + room name, then:
+  - Project bar: name + **Export Excel schedule** (all rooms, one row per material)
+  - Room tabs + **+ Add room**; switch rooms any time (unsaved rooms show a dot)
+  - **+ Add** (default) / **− Remove**: scanning a tag adds/removes its material in the active room; hover **×** removes a tile
+  - **Save room palette** → `room_materials` via `PUT /bridge/rooms/:id/materials`
+  - Append `?demo` to the URL for the offline mockup
 
 The local FastAPI bridge below still works for LAN-only setups (leave the device token empty).
 

@@ -15,20 +15,3 @@ export function bridgeHeaders(): Record<string, string> {
       }
     : { 'Content-Type': 'application/json' }
 }
-
-/** Remove one sample from the presentation table. */
-export async function removeScan(rfidId: string): Promise<void> {
-  if (!bridgeUrl) throw new Error('Bridge URL not configured')
-  const res = await fetch(`${bridgeUrl}/scan/${encodeURIComponent(rfidId)}`, {
-    method: 'DELETE',
-    headers: bridgeHeaders(),
-  })
-  if (!res.ok) throw new Error(`Remove failed (${res.status})`)
-}
-
-/** Remove every sample from the presentation table. */
-export async function clearScans(): Promise<void> {
-  if (!bridgeUrl) throw new Error('Bridge URL not configured')
-  const res = await fetch(`${bridgeUrl}/scans`, { method: 'DELETE', headers: bridgeHeaders() })
-  if (!res.ok) throw new Error(`Clear failed (${res.status})`)
-}

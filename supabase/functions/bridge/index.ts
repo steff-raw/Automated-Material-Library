@@ -5,6 +5,9 @@
 //   DELETE /bridge/scans                                device token or anon key
 //   POST   /bridge/materials       MaterialPayload      public anon key
 //   POST   /bridge/link            {rfid_id, material_id} public anon key
+//   POST   /bridge/projects        {name}               public anon key
+//   POST   /bridge/rooms           {project_id, name}   public anon key
+//   PUT    /bridge/rooms/:id/materials {material_ids}   public anon key
 //
 // Deployed with verify_jwt = false: the ESP32 authenticates with the
 // x-device-token header (checked against public.bridge_devices), the web app
@@ -18,7 +21,7 @@ const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers':
     'authorization, apikey, content-type, x-client-info, x-device-token',
 }
@@ -66,6 +69,15 @@ function cleanRfid(value: unknown): string | null {
 
 function optionalText(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value)
+}
+
+/** Exact, case-insensitive match for ilike */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`)
 }
 
 Deno.serve(async (req) => {
@@ -173,6 +185,70 @@ Deno.serve(async (req) => {
     await supabase.from('active_scans').delete().eq('rfid_id', rfid_id)
     console.log(`link ${rfid_id} -> ${material_id}`)
     return json({ ok: true, material: data })
+  }
+
+  // --- Projects → rooms → saved palettes (web app only) --------------------
+  if (path === '/projects' || path.startsWith('/rooms')) {
+    if (!(await isWebApp(req))) return json({ detail: 'Unauthorized' }, 401)
+    const body = req.method === 'GET' ? {} : await req.json().catch(() => ({}))
+
+    // Find-or-create a project by name (case-insensitive)
+    if (req.method === 'POST' && path === '/projects') {
+      const name = optionalText(body.name)
+      if (!name) return json({ detail: 'name is required' }, 400)
+      const { data: existing } = await supabase
+        .from('projects')
+        .select()
+        .ilike('name', escapeLike(name))
+        .maybeSingle()
+      if (existing) return json({ ok: true, project: existing })
+      const { data, error } = await supabase.from('projects').insert({ name }).select().single()
+      if (error) return json({ detail: 'Failed to create project' }, 502)
+      return json({ ok: true, project: data })
+    }
+
+    // Find-or-create a room in a project
+    if (req.method === 'POST' && path === '/rooms') {
+      const name = optionalText(body.name)
+      const project_id = isUuid(body.project_id) ? body.project_id : null
+      if (!name || !project_id) return json({ detail: 'project_id and name are required' }, 400)
+      const { data: existing } = await supabase
+        .from('rooms')
+        .select()
+        .eq('project_id', project_id)
+        .ilike('name', escapeLike(name))
+        .maybeSingle()
+      if (existing) return json({ ok: true, room: existing })
+      const { count } = await supabase
+        .from('rooms')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', project_id)
+      const { data, error } = await supabase
+        .from('rooms')
+        .insert({ project_id, name, position: count ?? 0 })
+        .select()
+        .single()
+      if (error) return json({ detail: 'Failed to create room' }, 502)
+      return json({ ok: true, room: data })
+    }
+
+    // Replace a room's saved palette
+    const match = path.match(/^\/rooms\/([^/]+)\/materials$/)
+    if (req.method === 'PUT' && match && isUuid(match[1])) {
+      const room_id = match[1]
+      const ids = Array.isArray(body.material_ids) ? body.material_ids.filter(isUuid) : null
+      if (!ids) return json({ detail: 'material_ids must be an array of ids' }, 400)
+      const { error: delError } = await supabase.from('room_materials').delete().eq('room_id', room_id)
+      if (delError) return json({ detail: 'Failed to save palette' }, 502)
+      const unique = [...new Set(ids as string[])]
+      if (unique.length > 0) {
+        const { error } = await supabase
+          .from('room_materials')
+          .insert(unique.map((material_id, position) => ({ room_id, material_id, position })))
+        if (error) return json({ detail: 'Failed to save palette' }, 502)
+      }
+      return json({ ok: true, count: unique.length })
+    }
   }
 
   return json({ detail: 'Not found' }, 404)

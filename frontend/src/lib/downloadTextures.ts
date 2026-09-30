@@ -36,7 +36,7 @@ function uniqueStems(materials: Material[]): Map<string, string> {
     const base = sanitizeFilename(material.name)
     const count = used.get(base) ?? 0
     used.set(base, count + 1)
-    result.set(material.rfid_id, count === 0 ? base : `${base}_${count + 1}`)
+    result.set(material.id, count === 0 ? base : `${base}_${count + 1}`)
   }
   return result
 }
@@ -57,7 +57,7 @@ export async function downloadTexturePack(materials: Material[]): Promise<void> 
   const infoRows: { material: Material; filename: string | null }[] = []
 
   for (const material of materials) {
-    const stem = stems.get(material.rfid_id) ?? sanitizeFilename(material.name)
+    const stem = stems.get(material.id) ?? sanitizeFilename(material.name)
 
     if (!material.image_url) {
       infoRows.push({ material, filename: null })

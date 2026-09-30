@@ -1,6 +1,7 @@
 export type Material = {
   id: string
-  rfid_id: string
+  /** Null once a tag has been moved to another material */
+  rfid_id: string | null
   name: string
   supplier: string | null
   cost_per_unit: string | null
