@@ -4,7 +4,7 @@ import type { Material } from '../types'
 import { IdleScreen } from './IdleScreen'
 import { MaterialWall } from './MaterialWall'
 
-const MAX_ON_TABLE = 5
+const MAX_ON_TABLE = 12
 
 type DemoBrowserProps = {
   onHome: () => void
@@ -43,7 +43,10 @@ export function DemoBrowser({ onHome, catalogVersion }: DemoBrowserProps) {
         {onTable.length === 0 ? (
           <IdleScreen />
         ) : (
-          <MaterialWall slots={slots} />
+          <MaterialWall
+            slots={slots}
+            onRemove={(rfidId) => setOnTable((prev) => prev.filter((id) => id !== rfidId))}
+          />
         )}
       </div>
 

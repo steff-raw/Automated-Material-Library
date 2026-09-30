@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { useTagScan } from '../hooks/useTagScan'
 import { bridgeHeaders, bridgeUrl } from '../lib/bridge'
 import { saveCustomMaterial } from '../lib/localMaterials'
+import { supabase } from '../lib/supabase'
 import type { Material } from '../types'
 
 type AddMaterialPageProps = {
@@ -74,6 +76,26 @@ export function AddMaterialPage({ onBack, onSaved }: AddMaterialPageProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  // Live mode captures the UID by tapping the tag; demo mode keeps a text field
+  const scan = useTagScan()
+  const rfid = scan.listening ? (scan.uid ?? '') : form.rfid_id.trim().toUpperCase()
+  const [linkedTo, setLinkedTo] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!supabase || !scan.uid) return
+    let cancelled = false
+    void supabase
+      .from('materials')
+      .select('name')
+      .eq('rfid_id', scan.uid)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setLinkedTo((data as { name: string } | null)?.name ?? null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [scan.uid])
 
   function update(name: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [name]: value }))
@@ -81,12 +103,16 @@ export function AddMaterialPage({ onBack, onSaved }: AddMaterialPageProps) {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (!rfid) {
+      setError('Tap the sample’s tag on the reader first.')
+      return
+    }
     setSaving(true)
     setError(null)
     setSuccess(null)
 
     const payload = {
-      rfid_id: form.rfid_id.trim().toUpperCase(),
+      rfid_id: rfid,
       name: form.name.trim(),
       supplier: form.supplier.trim() || null,
       cost_per_unit: form.cost_per_unit.trim() || null,
@@ -131,6 +157,8 @@ export function AddMaterialPage({ onBack, onSaved }: AddMaterialPageProps) {
 
       setSuccess(`Saved “${payload.name}”. It is available in View Material Assets.`)
       setForm(emptyForm)
+      scan.reset()
+      setLinkedTo(null)
       onSaved()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save material')
@@ -162,7 +190,7 @@ export function AddMaterialPage({ onBack, onSaved }: AddMaterialPageProps) {
           Add Material Asset
         </h1>
         <p className="mt-2 max-w-xl text-sm text-stone sm:text-base">
-          Register a sample with its RFID tag ID and specification data.
+          Tap the sample’s RFID tag on the reader, then enter its specification data.
           {!bridgeUrl && (
             <span className="block mt-1 text-mist">
               Demo mode: saved locally in this browser.
@@ -172,14 +200,48 @@ export function AddMaterialPage({ onBack, onSaved }: AddMaterialPageProps) {
 
         <form onSubmit={handleSubmit} className="mt-10 space-y-8">
           <section className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="RFID ID"
-              name="rfid_id"
-              value={form.rfid_id}
-              onChange={update}
-              required
-              placeholder="04A1B2C3"
-            />
+            {scan.listening ? (
+              <div className="sm:col-span-2 border border-ash/50 bg-paper/80 px-4 py-4">
+                <span className="text-[0.65rem] font-medium tracking-[0.25em] text-mist uppercase">
+                  RFID tag
+                </span>
+                {scan.uid ? (
+                  <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
+                    <span>
+                      <span className="font-display text-xl text-ink">{scan.uid}</span>
+                      <span className="ml-3 text-sm text-stone">
+                        {linkedTo
+                          ? `Linked to ${linkedTo} — saving replaces it`
+                          : 'New tag'}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        scan.reset()
+                        setLinkedTo(null)
+                      }}
+                      className="text-xs tracking-[0.15em] text-mist uppercase hover:text-ink"
+                    >
+                      Scan again
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-1 font-display text-xl text-mist animate-pulse-soft">
+                    Tap the sample’s tag on the reader…
+                  </p>
+                )}
+              </div>
+            ) : (
+              <Field
+                label="RFID ID"
+                name="rfid_id"
+                value={form.rfid_id}
+                onChange={update}
+                required
+                placeholder="04A1B2C3"
+              />
+            )}
             <Field
               label="Name"
               name="name"
@@ -265,7 +327,7 @@ export function AddMaterialPage({ onBack, onSaved }: AddMaterialPageProps) {
           <div className="flex flex-wrap gap-3 pt-2">
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || !rfid}
               className="bg-ink px-6 py-3 text-xs font-medium tracking-[0.2em] text-paper uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save Asset'}

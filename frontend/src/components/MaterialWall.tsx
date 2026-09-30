@@ -1,15 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { downloadTexturePack } from '../lib/downloadTextures'
 import type { Material } from '../types'
 import { DetailsTable } from './DetailsTable'
 import { MaterialCard } from './MaterialCard'
-
-export type Slot =
-  | { kind: 'material'; material: Material }
-  | { kind: 'unknown'; rfidId: string }
+import { slotRfid, type Slot } from '../lib/slots'
 
 type MaterialWallProps = {
   slots: Slot[]
+  /** Shows a hover × on each tile that removes it from the wall */
+  onRemove?: (rfidId: string) => void
 }
 
 function galleryGridClass(count: number): string {
@@ -23,8 +22,27 @@ function galleryGridClass(count: number): string {
     case 4:
       return 'grid-cols-2 grid-rows-2'
     default:
-      return 'grid-cols-2 grid-rows-3 md:grid-cols-3 md:grid-rows-2'
+      return ''
   }
+}
+
+/** 5+ tiles: near-square grid, wider than tall (5 → 3×2, 7 → 3×3, 12 → 4×3). */
+function galleryGridStyle(count: number): CSSProperties | undefined {
+  if (count < 5) return undefined
+  const cols = Math.ceil(Math.sqrt(count))
+  const rows = Math.ceil(count / cols)
+  return {
+    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+    gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+  }
+}
+
+/** 5+ tiles: the last tile stretches across any empty cells in the final row. */
+function galleryCellStyle(count: number, index: number): CSSProperties | undefined {
+  if (count < 5 || index !== count - 1) return undefined
+  const cols = Math.ceil(Math.sqrt(count))
+  const gap = cols * Math.ceil(count / cols) - count
+  return gap > 0 ? { gridColumn: `span ${gap + 1}` } : undefined
 }
 
 function galleryCellClass(count: number, index: number): string {
@@ -49,7 +67,7 @@ function placeholderMaterial(rfidId: string): Material {
   }
 }
 
-export function MaterialWall({ slots }: MaterialWallProps) {
+export function MaterialWall({ slots, onRemove }: MaterialWallProps) {
   const [showDetails, setShowDetails] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -103,15 +121,16 @@ export function MaterialWall({ slots }: MaterialWallProps) {
             style={
               showDetails
                 ? { gridTemplateRows: `repeat(${Math.max(count, 1)}, minmax(0, 1fr))` }
-                : undefined
+                : galleryGridStyle(count)
             }
           >
             {slots.map((slot, index) => (
               <div
-                key={slot.kind === 'material' ? slot.material.rfid_id : slot.rfidId}
-                className={`min-h-0 overflow-hidden bg-paper transition-all duration-500 ease-out ${
+                key={slotRfid(slot)}
+                className={`group/tile relative min-h-0 overflow-hidden bg-paper transition-all duration-500 ease-out ${
                   showDetails ? '' : galleryCellClass(count, index)
                 }`}
+                style={showDetails ? undefined : galleryCellStyle(count, index)}
               >
                 {slot.kind === 'material' ? (
                   <MaterialCard material={slot.material} strip={showDetails} />
@@ -121,6 +140,17 @@ export function MaterialWall({ slots }: MaterialWallProps) {
                     strip={showDetails}
                     material={placeholderMaterial(slot.rfidId)}
                   />
+                )}
+                {onRemove && (
+                  <button
+                    type="button"
+                    onClick={() => onRemove(slotRfid(slot))}
+                    aria-label="Remove from wall"
+                    title="Remove from wall"
+                    className="absolute top-2 right-2 z-30 flex h-7 w-7 items-center justify-center rounded-full bg-ink/70 text-sm leading-none text-paper opacity-0 shadow-sm transition-opacity duration-200 group-hover/tile:opacity-100 hover:bg-ink focus-visible:opacity-100"
+                  >
+                    ×
+                  </button>
                 )}
               </div>
             ))}
@@ -142,7 +172,7 @@ export function MaterialWall({ slots }: MaterialWallProps) {
       </div>
 
       {count > 0 && (
-        <div className="pointer-events-none absolute top-4 right-4 z-40 flex flex-col items-end gap-2 sm:top-5 sm:right-5">
+        <div className="pointer-events-none absolute right-4 bottom-4 z-40 flex flex-col items-end gap-2 sm:right-5 sm:bottom-5">
           <div className="pointer-events-auto flex flex-wrap justify-end gap-2">
             <button
               type="button"
