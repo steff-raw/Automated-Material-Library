@@ -1,8 +1,8 @@
 // Cloud bridge: replaces bridge/main.py so no local server is needed.
 //
 //   POST   /bridge/scan            {"rfid_id": "..."}   device token
-//   DELETE /bridge/scan/:rfid_id                        device token
-//   DELETE /bridge/scans                                device token
+//   DELETE /bridge/scan/:rfid_id                        device token or anon key
+//   DELETE /bridge/scans                                device token or anon key
 //   POST   /bridge/materials       MaterialPayload      public anon key
 //   POST   /bridge/link            {rfid_id, material_id} public anon key
 //
@@ -77,7 +77,12 @@ Deno.serve(async (req) => {
   if (req.method === 'GET' && path === '/health') return json({ status: 'ok' })
 
   if (path === '/scan' || path.startsWith('/scan/') || path === '/scans') {
-    if (!(await isDevice(req))) return json({ detail: 'Invalid device token' }, 401)
+    // Only the reader places samples; the web app may also take them off the table
+    const allowed =
+      req.method === 'POST'
+        ? await isDevice(req)
+        : (await isDevice(req)) || (await isWebApp(req))
+    if (!allowed) return json({ detail: 'Unauthorized' }, 401)
 
     if (req.method === 'POST' && path === '/scan') {
       const body = await req.json().catch(() => ({}))

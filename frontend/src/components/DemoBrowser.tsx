@@ -3,9 +3,8 @@ import { getAllLocalMaterials } from '../lib/localMaterials'
 import type { Material } from '../types'
 import { IdleScreen } from './IdleScreen'
 import { MaterialWall } from './MaterialWall'
-import { fillSlots } from '../lib/slots'
-import { SlotControls } from './SlotControls'
-import { useSlotCount } from '../hooks/useSlotCount'
+
+const MAX_ON_TABLE = 12
 
 type DemoBrowserProps = {
   onHome: () => void
@@ -14,27 +13,22 @@ type DemoBrowserProps = {
 
 export function DemoBrowser({ onHome, catalogVersion }: DemoBrowserProps) {
   const [onTable, setOnTable] = useState<string[]>([])
-  const slotCount = useSlotCount()
-  const maxOnTable = slotCount.count
   const catalog = useMemo(() => getAllLocalMaterials(), [catalogVersion])
 
   const slots = useMemo(() => {
-    return fillSlots(
-      onTable.map((rfidId) => {
-        const material = catalog.find((m) => m.rfid_id === rfidId)
-        if (material) return { kind: 'material' as const, material }
-        return { kind: 'unknown' as const, rfidId }
-      }),
-      maxOnTable,
-    )
-  }, [onTable, catalog, maxOnTable])
+    return onTable.map((rfidId) => {
+      const material = catalog.find((m) => m.rfid_id === rfidId)
+      if (material) return { kind: 'material' as const, material }
+      return { kind: 'unknown' as const, rfidId }
+    })
+  }, [onTable, catalog])
 
   function place(material: Material) {
     setOnTable((prev) => {
       if (prev.includes(material.rfid_id)) {
         return prev.filter((id) => id !== material.rfid_id)
       }
-      if (prev.length >= maxOnTable) return prev
+      if (prev.length >= MAX_ON_TABLE) return prev
       return [...prev, material.rfid_id]
     })
   }
@@ -49,7 +43,10 @@ export function DemoBrowser({ onHome, catalogVersion }: DemoBrowserProps) {
         {onTable.length === 0 ? (
           <IdleScreen />
         ) : (
-          <MaterialWall slots={slots} />
+          <MaterialWall
+            slots={slots}
+            onRemove={(rfidId) => setOnTable((prev) => prev.filter((id) => id !== rfidId))}
+          />
         )}
       </div>
 
@@ -64,14 +61,9 @@ export function DemoBrowser({ onHome, catalogVersion }: DemoBrowserProps) {
               ← Home
             </button>
             <p className="text-[0.65rem] font-medium tracking-[0.2em] text-ash uppercase">
-              Place samples ({Math.min(onTable.length, maxOnTable)}/{maxOnTable})
+              Place samples ({onTable.length}/{MAX_ON_TABLE})
             </p>
           </div>
-          <SlotControls
-            count={slotCount.count}
-            onIncrement={slotCount.increment}
-            onDecrement={slotCount.decrement}
-          />
           <button
             type="button"
             onClick={clearTable}
@@ -84,7 +76,7 @@ export function DemoBrowser({ onHome, catalogVersion }: DemoBrowserProps) {
         <div className="flex gap-2 overflow-x-auto pb-1">
           {catalog.map((material) => {
             const active = onTable.includes(material.rfid_id)
-            const full = !active && onTable.length >= maxOnTable
+            const full = !active && onTable.length >= MAX_ON_TABLE
             return (
               <button
                 key={material.rfid_id}

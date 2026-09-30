@@ -5,11 +5,11 @@ import { HomeScreen } from './components/HomeScreen'
 import { IdleScreen } from './components/IdleScreen'
 import { LinkMaterialsPage } from './components/LinkMaterialsPage'
 import { MaterialWall } from './components/MaterialWall'
-import { fillSlots } from './lib/slots'
-import { SlotControls } from './components/SlotControls'
+import { ScanModeToggle, type ScanMode } from './components/ScanModeToggle'
 import { useActiveScans } from './hooks/useActiveScans'
 import { useMaterialsByRfids } from './hooks/useMaterialsByRfids'
-import { useSlotCount } from './hooks/useSlotCount'
+import { useScanEvents } from './hooks/useScanEvents'
+import { clearScans, removeScan } from './lib/bridge'
 import { hasSupabaseConfig } from './lib/supabase'
 
 type AppPage = 'home' | 'add' | 'view' | 'link'
@@ -72,9 +72,33 @@ export default function App() {
 
 function LiveApp({ onHome }: { onHome: () => void }) {
   const { scans, ready } = useActiveScans()
-  const slotCount = useSlotCount()
-  const rfidIds = scans.slice(-slotCount.count).map((s) => s.rfid_id)
+  const rfidIds = scans.map((s) => s.rfid_id)
   const { materials, loading, error } = useMaterialsByRfids(rfidIds)
+  // + adds scanned tags to the wall (the bridge already did); − removes them again
+  const [mode, setMode] = useState<ScanMode>('add')
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  async function remove(rfidId: string) {
+    setActionError(null)
+    try {
+      await removeScan(rfidId)
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Remove failed')
+    }
+  }
+
+  async function clearAll() {
+    setActionError(null)
+    try {
+      await clearScans()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Clear failed')
+    }
+  }
+
+  useScanEvents((rfidId) => {
+    if (mode === 'remove') void remove(rfidId)
+  })
 
   if (!ready) {
     return <LoadingState label="Connecting" />
@@ -104,24 +128,32 @@ function LiveApp({ onHome }: { onHome: () => void }) {
           </div>
         ) : (
           <MaterialWall
-            slots={fillSlots(
-              rfidIds.map((rfidId) => {
-                const material = materials.find((m) => m.rfid_id === rfidId)
-                if (material) return { kind: 'material' as const, material }
-                return { kind: 'unknown' as const, rfidId }
-              }),
-              slotCount.count,
-            )}
+            slots={rfidIds.map((rfidId) => {
+              const material = materials.find((m) => m.rfid_id === rfidId)
+              if (material) return { kind: 'material' as const, material }
+              return { kind: 'unknown' as const, rfidId }
+            })}
+            onRemove={(rfidId) => void remove(rfidId)}
           />
         )}
       </div>
 
-      <div className="z-50 flex shrink-0 justify-center border-t border-ash/40 bg-ink/90 px-3 py-3 text-paper backdrop-blur-sm">
-        <SlotControls
-          count={slotCount.count}
-          onIncrement={slotCount.increment}
-          onDecrement={slotCount.decrement}
-        />
+      <div className="z-50 flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-ash/40 bg-ink/90 px-4 py-3 text-paper backdrop-blur-sm">
+        <p className="min-w-[12rem] text-[0.65rem] font-medium tracking-[0.2em] text-ash uppercase">
+          {mode === 'add' ? 'Scan a tag to add it' : 'Scan a tag to remove it'}
+          {actionError && <span className="ml-3 normal-case tracking-normal text-red-300">{actionError}</span>}
+        </p>
+        <ScanModeToggle mode={mode} onChange={setMode} />
+        <div className="flex min-w-[12rem] justify-end">
+          <button
+            type="button"
+            onClick={() => void clearAll()}
+            disabled={rfidIds.length === 0}
+            className="rounded border border-ash/40 px-3 py-1.5 text-xs tracking-wide hover:bg-paper/10 disabled:opacity-40"
+          >
+            Clear all
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -3,26 +3,12 @@ import { downloadTexturePack } from '../lib/downloadTextures'
 import type { Material } from '../types'
 import { DetailsTable } from './DetailsTable'
 import { MaterialCard } from './MaterialCard'
-import type { Slot } from '../lib/slots'
-
-function slotKey(slot: Slot): string {
-  if (slot.kind === 'material') return slot.material.rfid_id
-  if (slot.kind === 'unknown') return slot.rfidId
-  return slot.key
-}
-
-function EmptyTile() {
-  return (
-    <div className="flex h-full min-h-0 items-center justify-center bg-paper">
-      <p className="text-[0.6rem] font-medium tracking-[0.25em] text-ash uppercase">
-        Place a sample
-      </p>
-    </div>
-  )
-}
+import { slotRfid, type Slot } from '../lib/slots'
 
 type MaterialWallProps = {
   slots: Slot[]
+  /** Shows a hover × on each tile that removes it from the wall */
+  onRemove?: (rfidId: string) => void
 }
 
 function galleryGridClass(count: number): string {
@@ -81,18 +67,15 @@ function placeholderMaterial(rfidId: string): Material {
   }
 }
 
-export function MaterialWall({ slots }: MaterialWallProps) {
+export function MaterialWall({ slots, onRemove }: MaterialWallProps) {
   const [showDetails, setShowDetails] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
-  const filledCount = slots.filter((s) => s.kind !== 'empty').length
-  // Empty tiles only pad the full wall; the details strip lists real samples
-  const shown = showDetails ? slots.filter((s) => s.kind !== 'empty') : slots
-  const count = shown.length
+  const count = slots.length
 
   useEffect(() => {
-    if (filledCount === 0) setShowDetails(false)
-  }, [filledCount])
+    if (count === 0) setShowDetails(false)
+  }, [count])
 
   const knownMaterials = useMemo(
     () =>
@@ -141,24 +124,33 @@ export function MaterialWall({ slots }: MaterialWallProps) {
                 : galleryGridStyle(count)
             }
           >
-            {shown.map((slot, index) => (
+            {slots.map((slot, index) => (
               <div
-                key={slotKey(slot)}
-                className={`min-h-0 overflow-hidden bg-paper transition-all duration-500 ease-out ${
+                key={slotRfid(slot)}
+                className={`group/tile relative min-h-0 overflow-hidden bg-paper transition-all duration-500 ease-out ${
                   showDetails ? '' : galleryCellClass(count, index)
                 }`}
                 style={showDetails ? undefined : galleryCellStyle(count, index)}
               >
                 {slot.kind === 'material' ? (
                   <MaterialCard material={slot.material} strip={showDetails} />
-                ) : slot.kind === 'empty' ? (
-                  <EmptyTile />
                 ) : (
                   <MaterialCard
                     unknown
                     strip={showDetails}
                     material={placeholderMaterial(slot.rfidId)}
                   />
+                )}
+                {onRemove && (
+                  <button
+                    type="button"
+                    onClick={() => onRemove(slotRfid(slot))}
+                    aria-label="Remove from wall"
+                    title="Remove from wall"
+                    className="absolute top-2 right-2 z-30 flex h-7 w-7 items-center justify-center rounded-full bg-ink/70 text-sm leading-none text-paper opacity-0 shadow-sm transition-opacity duration-200 group-hover/tile:opacity-100 hover:bg-ink focus-visible:opacity-100"
+                  >
+                    ×
+                  </button>
                 )}
               </div>
             ))}
@@ -179,8 +171,8 @@ export function MaterialWall({ slots }: MaterialWallProps) {
         )}
       </div>
 
-      {filledCount > 0 && (
-        <div className="pointer-events-none absolute top-4 right-4 z-40 flex flex-col items-end gap-2 sm:top-5 sm:right-5">
+      {count > 0 && (
+        <div className="pointer-events-none absolute right-4 bottom-4 z-40 flex flex-col items-end gap-2 sm:right-5 sm:bottom-5">
           <div className="pointer-events-auto flex flex-wrap justify-end gap-2">
             <button
               type="button"
